@@ -2,6 +2,7 @@
 //   node tests/e2e.mjs <url> <截图输出目录> [playwright模块路径]
 import path from "node:path";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 const [url, outDir, pwPath] = process.argv.slice(2);
 const { chromium } = await import(pwPath || "playwright");
 fs.mkdirSync(outDir, { recursive: true });
@@ -11,7 +12,7 @@ const check = (c, msg) => { if (!c) { fail.push(msg); console.log("  FAIL:", msg
 const browser = await chromium.launch();
 for (const sz of sizes) {
   console.log(`== ${sz.name} ==`);
-  const ctx = await browser.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: sz.mobile ? 2 : 1, isMobile: sz.mobile, hasTouch: sz.mobile, locale: "zh-CN" });
+  const ctx = await browser.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: sz.mobile ? 2 : 1, isMobile: sz.mobile, hasTouch: sz.mobile, locale: "zh-CN", ...(sz.mobile ? { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" } : {}) });
   const page = await ctx.newPage();
   const errs = [], reqs = [];
   page.on("pageerror", (e) => errs.push("pageerror " + e.message));
@@ -74,28 +75,75 @@ for (const sz of sizes) {
   check(rep.includes("漏能量层") && rep.includes("加权总分") && rep.includes("7天自我练习") && rep.includes("想有人陪你聊聊？"), "报告关键板块");
   check(rep.includes("不是医学或心理诊断"), "页脚声明");
   const svgs = await page.evaluate(() => [...document.querySelectorAll(".chart svg")].map((s) => { const b = s.getBoundingClientRect(); return { w: b.width, h: b.height, polys: s.querySelectorAll("polygon,path").length, texts: s.querySelectorAll("text").length }; }));
-  check(svgs.length === 2 && svgs.every((s) => s.w > 250 && s.h > 200 && s.polys > 5 && s.texts >= 6), "雷达图与金字塔图渲染 " + JSON.stringify(svgs));
+  check(svgs.length === 2 && svgs.every((s) => s.w > 250 && s.h > 200 && s.polys > 5 && s.texts >= 6), "3D 金字塔与雷达图渲染 " + JSON.stringify(svgs));
+  const pyrTxt = await page.locator("#pyr3d").evaluate((e) => e.textContent);
+  check(["珍爱", "允许接纳", "有序性", "平和性", "自聚性", "积极性", "理解与边界", "漏"].every((w) => pyrTxt.includes(w)), "3D 金字塔含各层名称与漏章");
   check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "无横向溢出");
+  const fit = await page.locator("#pyr3d svg").evaluate((svg) => {
+    const vb = svg.viewBox.baseVal, bad = [];
+    svg.querySelectorAll("text").forEach((t) => { const b = t.getBBox(); if (b.x < vb.x || b.x + b.width > vb.x + vb.width || b.y < vb.y || b.y + b.height > vb.y + vb.height) bad.push(t.textContent); });
+    const chip = [...svg.querySelectorAll("g")].find((g) => g.textContent.startsWith("理解与边界"));
+    const rect = chip && chip.querySelector("rect").getBBox(), tx = chip && chip.querySelector("text").getBBox();
+    return { bad, chipOK: !!chip && tx.width < rect.width - 8 };
+  });
+  check(fit.bad.length === 0 && fit.chipOK, "金字塔文字均在画布内、底座标签不被遮挡 " + JSON.stringify(fit));
   await shot("05-result-top");
   await page.locator("#h-pyr").scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
   await page.locator("#pyr-chart").screenshot({ path: path.join(outDir, `${sz.name}-06-result-pyramid.png`) });
+  // 自动缓慢旋转：两次取样 transform 不同
+  const sig = () => page.locator("#pyr3d .scene").evaluate((e) => e.innerHTML.length + ":" + e.innerHTML.slice(0, 400));
+  const s1 = await sig(); await page.waitForTimeout(1500); const s2 = await sig();
+  check(s1 !== s2, "3D 金字塔自动缓慢旋转");
+  // 拖动旋转（触摸/鼠标）
+  const box = await page.locator("#pyr3d").boundingBox();
+  const before = await sig();
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down(); await page.mouse.move(box.x + box.width / 2 + 90, box.y + box.height / 2, { steps: 6 });
+  const mid = await sig(); await page.mouse.up();
+  check(mid !== before, "拖动可旋转 3D 金字塔");
+  await page.locator("#pyr-chart").screenshot({ path: path.join(outDir, `${sz.name}-06b-result-pyramid-dragged.png`) });
   await page.locator("#h-rad").scrollIntoViewIfNeeded();
   await page.locator("#h-rad").locator("xpath=..").screenshot({ path: path.join(outDir, `${sz.name}-07-result-radar.png`) });
   await shot("08-result-full", { fullPage: true });
+  // 二维码区块 + 弹层
+  await page.locator(".talk").scrollIntoViewIfNeeded();
+  check(!(await page.locator(".talk").innerText()).includes("敬请期待"), "无“敬请期待”占位");
+  const qrOK = await page.locator(".talk img").evaluate((im) => im.complete && im.naturalWidth > 500);
+  check(qrOK, "结果页二维码图片加载成功");
+  await page.locator(".talk").screenshot({ path: path.join(outDir, `${sz.name}-09a-talk-section.png`) });
+  await page.click("#talk");
+  check(await page.locator("dialog#dlg[open]").count() === 1, "二维码弹层可打开");
+  check((await page.locator("dialog#dlg[open]").innerText()).includes("长按识别二维码"), "弹层含“长按识别二维码”");
+  await page.waitForTimeout(300);
+  await page.locator("dialog#dlg[open]").screenshot({ path: path.join(outDir, `${sz.name}-09-qr-dialog.png`) });
+  await page.click("#dlg-x");
+  await page.click(".day[data-d='1']");
+  check(await page.locator(".day[aria-pressed=true]").count() === 1, "7天打卡可点");
+  // 导出长图
+  await page.locator("#save-img").scrollIntoViewIfNeeded();
+  const dlP = sz.mobile ? null : page.waitForEvent("download", { timeout: 20000 });
+  await page.click("#save-img");
+  await page.waitForSelector("dialog#img-dlg[open]", { timeout: 30000 });
+  await page.waitForFunction(() => { const i = document.getElementById("out-img"); return i && i.complete && i.naturalWidth > 1000; });
+  const info = await page.evaluate(() => { const i = document.getElementById("out-img"); return { w: i.naturalWidth, h: i.naturalHeight, tip: document.getElementById("img-tip").innerText }; });
+  check(info.w >= 1400 && info.w <= 2200 && info.h > 6000, `导出图尺寸 ${info.w}x${info.h}（宽≥1400 即 750@2x）`);
+  if (sz.mobile) check(info.tip.includes("长按"), "手机导出预览提示长按保存"); 
+  if (dlP) { const d = await dlP; const f = path.join(outDir, `${sz.name}-export-download.png`); await d.saveAs(f); check(/^珍爱金字塔-\d{8}\.png$/.test(d.suggestedFilename()), "桌面端触发下载 " + d.suggestedFilename()); }
+  const dataUrl = await page.evaluate(async () => { const i = document.getElementById("out-img"); const b = await (await fetch(i.src)).blob(); return await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); }); });
+  fs.writeFileSync(path.join(outDir, `${sz.name}-export-report.png`), Buffer.from(dataUrl.split(",")[1], "base64"));
+  check(true, "导出长图已保存 " + `${sz.name}-export-report.png`);
+  await page.locator("dialog#img-dlg[open]").screenshot({ path: path.join(outDir, `${sz.name}-10-export-dialog.png`) });
+  await page.click("#img-x");
+  check(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "弹层关闭后无横向溢出");
   // 刷新后结果仍在
   await page.reload({ waitUntil: "networkidle" });
   await page.waitForSelector("#pyr-chart svg");
   check(true, "刷新后结果页恢复");
-  await page.click("#talk");
-  check(await page.locator("dialog[open]").count() === 1, "陪谈占位弹层可打开");
-  await page.locator("dialog[open]").screenshot({ path: path.join(outDir, `${sz.name}-09-dialog.png`) });
-  await page.click("#dlg-x");
-  await page.click(".day[data-d='1']");
-  check(await page.locator(".day[aria-pressed=true]").count() === 1, "7天打卡可点");
   // 回首页 → 查看上次结果 → 重新测
   await page.click("#tohome");
   await page.waitForSelector("#viewlast");
-  await shot("10-home-after");
+  await shot("11-home-after");
   await page.click("#viewlast");
   await page.waitForSelector("#retake");
   await page.click("#retake");
@@ -103,7 +151,7 @@ for (const sz of sizes) {
   check(true, "重新测一次回到提示页");
   // 外部请求检查
   const origin = new URL(url).origin;
-  const ext = reqs.filter((u) => !u.startsWith(origin) && !u.startsWith("data:"));
+  const ext = reqs.filter((u) => !u.startsWith(origin) && !u.startsWith("data:") && !u.startsWith("blob:" + origin));
   check(ext.length === 0, "无任何外部请求 " + ext.join(","));
   check(errs.length === 0, "无控制台/网络错误 " + errs.join(" | "));
   await ctx.close();
@@ -132,6 +180,20 @@ for (const [name, vals] of [["all5", 5], ["all1", 1]]) {
   check((await page.locator(".banner").innerText()).includes("重新开始"), "损坏数据→提示并重置");
   await page.screenshot({ path: path.join(outDir, `m390-x-corrupt.png`) });
   check(errs.length === 0, "损坏数据无报错");
+  await ctx.close();
+}
+{
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce", isMobile: true, hasTouch: true });
+  const page = await ctx.newPage(); const errs = [];
+  page.on("pageerror", (e) => errs.push(e.message));
+  await page.goto(url);
+  await page.evaluate(() => localStorage.setItem("zhenai-pyramid:v1", JSON.stringify({ v: 1, stage: "result", idx: 35, answers: Array(36).fill(2), done: Array(36).fill(2), practice: [], updated: 1 })));
+  await page.reload({ waitUntil: "networkidle" });
+  await page.waitForSelector("#pyr3d svg");
+  const sg = () => page.locator("#pyr3d .scene").evaluate((e) => e.innerHTML);
+  const a1 = await sg(); await page.waitForTimeout(1500);
+  check(a1 === await sg(), "prefers-reduced-motion：3D 金字塔静止");
+  check(errs.length === 0, "reduced-motion 无报错");
   await ctx.close();
 }
 await browser.close();

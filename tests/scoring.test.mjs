@@ -116,4 +116,68 @@ t("关联规则触发", () => {
   assert.ok(r.relations.length <= 2);
 });
 
+/* ---------- 3D 金字塔 / 报告模型 ---------- */
+import { buildScene, pyramid3dSVG, DEFAULT_VIEW, YAW_LIMIT } from "../js/pyramid3d.js";
+import { buildReport, TALK, QR_PATH } from "../js/report.js";
+import fs from "node:fs";
+
+const SC = { A: 70, B: 30, C: 55, D: 85, E: 45, F: 62 };
+t("3D 金字塔：任意角度都生成多边形，且含 6 层名称 + 分数 + 珍爱", () => {
+  for (const yaw of [-YAW_LIMIT, -24, 0, 30, YAW_LIMIT]) {
+    const sc = buildScene(SC, 64, "B", { yaw, pitch: 24 });
+    assert.ok(sc.ops.length > 20, "多边形数量");
+    for (const o of sc.ops) for (const p of o.pts) assert.ok(Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    const names = sc.labels.filter((l) => l.kind !== "seal").map((l) => l.name);
+    for (const n of ["珍爱", "允许接纳", "有序性", "平和性", "自聚性", "积极性", "理解与边界"]) assert.ok(names.includes(n), n);
+  }
+});
+t("3D 金字塔：最低分层有且仅有一个“漏”章（支柱/中层/底座）", () => {
+  for (const low of ["A", "B", "C", "D", "E", "F"]) {
+    const sc = buildScene({ ...SC, [low]: 5 }, 50, low);
+    const seals = sc.labels.filter((l) => l.kind === "seal").length + sc.labels.filter((l) => l.kind === "chip" && l.leak).length;
+    assert.equal(seals, 1, low);
+    const svg = pyramid3dSVG({ ...SC, [low]: 5 }, 50, low);
+    assert.ok(svg.includes("漏") && svg.includes('stroke-dasharray="5 3"'), "漏章与红色虚线 " + low);
+  }
+});
+t("3D 金字塔：分数 0 / 100 / 同分不报错；SVG 良构（无 NaN）", () => {
+  for (const v of [0, 100, 50]) {
+    const sc = Object.fromEntries(DIM_ORDER.map((k) => [k, v]));
+    const svg = pyramid3dSVG(sc, v, "A", DEFAULT_VIEW, { size: [640, 646], font: "sans-serif" });
+    assert.ok(!svg.includes("NaN") && !svg.includes("undefined"));
+    assert.ok(svg.startsWith("<svg") && svg.endsWith("</svg>"));
+  }
+});
+t("3D 金字塔：分级配色与 levelOf 一致（优先照顾=赭红 / 稳定=青）", () => {
+  const svgLow = pyramid3dSVG({ ...SC, A: 10 }, 50, "A");
+  const svgHigh = pyramid3dSVG({ ...SC, A: 95 }, 50, "B");
+  assert.ok(svgLow.includes("rgb(") && svgHigh.includes("rgb("));
+  assert.notEqual(svgLow, svgHigh);
+});
+t("报告模型：与计分一致，含全部板块与二维码文案", () => {
+  const ans = Array(36).fill(3); ans[0] = 5; ans[5] = 1;
+  const r = computeResult(ans);
+  const m = buildReport(r, [1, 3]);
+  assert.ok(m.title.includes(DIMS[r.lowest].name));
+  assert.equal(m.dims.length, 6);
+  assert.deepEqual(m.dims.map((d) => d.score), [...m.dims.map((d) => d.score)].sort((a, b) => b - a));
+  assert.equal(m.dims.filter((d) => d.leak).length, 1);
+  assert.deepEqual(m.practice.done, [1, 3]);
+  assert.ok(m.relations.length >= 1);
+  assert.ok(m.recommendation.paras.length >= 1);
+  assert.ok(m.footer.join("").includes("不是医学或心理诊断"));
+  assert.ok(TALK.lines.join("").includes("珍爱金字塔") && TALK.note.includes("长按识别二维码"));
+});
+t("二维码图片已入库，且是 PNG、大小合理", () => {
+  const b = fs.readFileSync(new URL("../" + QR_PATH, import.meta.url));
+  assert.equal(b.slice(1, 4).toString(), "PNG");
+  assert.ok(b.length > 20000 && b.length < 600000, "size " + b.length);
+});
+t("无外部请求：源码中不出现 http(s) 外链（命名空间除外）", () => {
+  for (const f of ["app", "export", "pyramid3d", "report", "charts"]) {
+    const src = fs.readFileSync(new URL(`../js/${f}.js`, import.meta.url), "utf8").replace(/http:\/\/www\.w3\.org\/2000\/svg/g, "");
+    assert.ok(!/https?:\/\//.test(src), f);
+  }
+});
+
 console.log(`\n${n} 组测试全部通过`);
