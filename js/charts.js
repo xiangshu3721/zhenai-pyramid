@@ -49,7 +49,7 @@ export function radarSVG(scores, lowest, highest) {
 
 /* ---------------- 金字塔结构图 ---------------- */
 export function pyramidSVG(scores, total, lowest) {
-  const cx = 200, apexY = 62, baseY = 332, halfBase = 120;
+  const cx = 200, apexY = 62, baseY = 332, halfBase = 142;
   const hw = (y) => (halfBase * (y - apexY)) / (baseY - apexY);
   const poly = (pts) => pts.map((p) => `${f(p[0])},${f(p[1])}`).join(" ");
   const layers = [];
@@ -77,7 +77,7 @@ export function pyramidSVG(scores, total, lowest) {
   let defs = "", body = "";
   // 外圈：理解与边界
   const ringS = scores.F;
-  const ringPath = "M200,400 A190,195 0 1 1 200,10 A190,195 0 1 1 200,400";
+  const ringPath = "M200,400 A205,195 0 1 1 200,10 A205,195 0 1 1 200,400";
   body += `<path d="${ringPath}" pathLength="100" fill="none" stroke="#E4D9C0" stroke-width="10"/>`;
   body += `<path d="${ringPath}" pathLength="100" fill="none" stroke="${colorOf(ringS)}" stroke-width="10" stroke-dasharray="${ringS} ${100 - ringS}"/>`;
   body += `<path d="${ringPath}" pathLength="100" fill="none" stroke="${INK}" stroke-opacity="0.25" stroke-width="0.8" transform="translate(0,0)"/>`;
@@ -97,13 +97,13 @@ export function pyramidSVG(scores, total, lowest) {
     const isLow = L.dim && L.dim === lowest;
     body += `<polygon points="${poly(L.pts)}" fill="none" stroke="${isLow ? SEAL : INK}" stroke-opacity="${isLow ? 1 : 0.55}" stroke-width="${isLow ? 2.2 : 1}" ${isLow ? 'stroke-dasharray="5 3"' : ""} stroke-linejoin="round"/>`;
     body += `</g>`;
-    const fs = L.small ? 14 : L.pillar ? 12.5 : 14;
+    const fs = L.small ? 14 : L.pillar ? 12 : 14;
     body += `<text x="${f(L.tx)}" y="${L.ty}" text-anchor="middle" font-size="${fs}" fill="${INK}" font-weight="700">${L.name}</text>`;
     body += `<text x="${f(L.tx)}" y="${L.ty + (L.small ? 14 : 19)}" text-anchor="middle" font-size="${L.small ? 11 : 13}" fill="${INK}" fill-opacity="0.8">${L.score}</text>`;
     if (isLow && L.sealAt) body += seal(L.sealAt[0], L.sealAt[1]);
   }
   const desc = `珍爱金字塔：整体${total}分；` + DIM_ORDER.map((k) => `${DIMS[k].name}${scores[k]}分`).join("，") + `；最低为${DIMS[lowest].name}，是漏能量层`;
-  return `<svg viewBox="0 0 400 425" role="img" aria-label="${desc}" xmlns="http://www.w3.org/2000/svg" font-family="inherit"><defs>${defs}</defs>${body}</svg>`;
+  return `<svg viewBox="-20 0 440 425" role="img" aria-label="${desc}" xmlns="http://www.w3.org/2000/svg" font-family="inherit"><defs>${defs}</defs>${body}</svg>`;
 }
 
 function seal(x, y) {
