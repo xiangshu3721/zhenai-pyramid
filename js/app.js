@@ -1,7 +1,10 @@
 import { DIMS, DIM_ORDER, QUESTIONS, SCALE, CONCEPTS, LEVELS } from "./data.js";
 import { computeResult, isComplete, levelOf } from "./scoring.js";
 import { DIM_TEXT, RELATION_TEXT, GENERIC_RELATION, FOOTER_NOTE } from "./content.js";
-import { radarSVG, pyramidSVG, LEVEL_COLOR } from "./charts.js";
+import { radarSVG, LEVEL_COLOR } from "./charts.js";
+import { mountPyramid3D, pyramidDescription } from "./pyramid3d.js";
+import { buildReport, TALK, QR_PATH } from "./report.js";
+import { renderReportImage, fmtDate, fileNameFor } from "./export.js";
 import * as store from "./storage.js";
 
 const app = document.getElementById("app");
@@ -156,26 +159,12 @@ function finish() {
 }
 
 /* ---------- 结果 ---------- */
-function openingText(r) {
-  const H = DIMS[r.highest].name, L = DIMS[r.lowest].name;
-  if (r.allEqual) return `你的六个层面发展得相当均衡，没有哪一层特别突出，也没有哪一层特别薄。接下来可以从你最想照顾的那一层开始，慢慢来。`;
-  const second = r.weak[1];
-  if (r.weak.length >= 2 && r.weak[0] === r.lowest) {
-    return `你的珍爱金字塔并不缺少向上的力量，你的「<em>${H}</em>」是目前最扎实的一层；但「<em>${L}</em>」与「<em>${DIMS[second].name}</em>」是当前较薄弱的两层。${DIM_TEXT[r.lowest].need}`;
-  }
-  if (r.weak.length === 1) {
-    return `你的珍爱金字塔整体是有力量的，你的「<em>${H}</em>」是目前最扎实的一层；相对薄一点的是「<em>${L}</em>」。${DIM_TEXT[r.lowest].need}`;
-  }
-  return `你的珍爱金字塔整体是稳的，你的「<em>${H}</em>」是目前最扎实的一层；相对最薄的是「<em>${L}</em>」，但也只是“相对”——它依然是可用的资源。如果想再往前一步，可以从这里开始：${DIM_TEXT[r.lowest].need}`;
-}
 function levelLegend() {
   return `<div class="legend">${[...LEVELS].reverse().map((l) => `<span><i style="background:${LEVEL_COLOR[l.id]}"></i>${l.name}</span>`).join("")}</div>`;
 }
-function recommendation(r) {
-  const low = r.lowest, s = r.scores[low], T = DIM_TEXT[low], H = r.highest;
-  if (s < 40) return `<div class="card leak"><h3>优先修复主题 <span class="tag leak">${DIMS[low].name} ${s}</span></h3><p><b>${T.theme}</b></p><p>这一层目前处在“优先照顾”的位置，建议把它当作近期成长的重点；如果它已经明显影响睡眠、工作或关系，找一位专业的人聊聊会更有帮助。</p><p>先别同时改很多事。只做下面的7天练习，其他的先放一放。</p></div>`;
-  if (s < 60) return `<div class="card"><h3>推荐：7天自助练习 <span class="tag neutral">${DIMS[low].name} ${s}</span></h3><p>这一层是你当前比较明显的耗能点，但还在可以自己慢慢修复的范围。试试下面的7天练习，每天花不到两分钟。</p></div>`;
-  return `<div class="card good"><h3>优势资源如何帮助其他维度 <span class="tag good">${DIMS[H].name} ${r.scores[H]}</span></h3><p>${DIM_TEXT[H].helps}</p><p>你的六个层面整体都在“可用”以上，最薄的「${DIMS[low].name}」也不是问题，只是还有提升空间。下面的练习可当作轻量的日常巩固。</p></div>`;
+function recoHTML(rec) {
+  const paras = rec.paras.map((t, i) => `<p>${rec.boldFirst && i === 0 ? `<b>${t}</b>` : t}</p>`).join("");
+  return `<div class="card ${rec.kind === "plain" ? "" : rec.kind}"><h3>${rec.title} <span class="tag ${rec.tagClass}">${rec.tag}</span></h3>${paras}</div>`;
 }
 function renderResult() {
   if (!state.done || !isComplete(state.done)) { notice = "还没有完整的结果，请先答完题目。"; return renderHome(); }
@@ -183,18 +172,19 @@ function renderResult() {
   try { r = computeResult(state.done); } catch (e) { return renderError(e); }
   state.stage = "result"; persist();
   const L = r.lowest, H = r.highest, T = DIM_TEXT[L];
-  const rels = r.relations.length ? r.relations.map((x) => RELATION_TEXT[x.id]) : [GENERIC_RELATION];
+  const M = buildReport(r, state.practice);
+  const rels = M.relations;
   mount(`
   <main class="report">
     <div class="kicker"><span class="seal-mark" aria-hidden="true">爱</span><span>你的珍爱金字塔</span></div>
     <h1>最薄的一层是「${DIMS[L].name}」</h1>
-    <p class="opening">${openingText(r)}</p>
+    <p class="opening">${M.opening}</p>
     <p class="total-chip" title="加权总分仅作参考，不掩盖短板">加权总分（参考）<b>${r.total}</b> · ${r.totalLevel.name}　<span>仅作参考，请更多看分项与短板</span></p>
 
     <section class="section" aria-labelledby="h-pyr">
       <h2 id="h-pyr">珍爱金字塔</h2>
       <p class="cap">每一层填得越满，说明那一层越稳；带红“漏”字的是最薄的一层。</p>
-      <div class="chart" id="pyr-chart">${pyramidSVG(r.scores, r.total, L)}${levelLegend()}</div>
+      <div class="chart pyr3d-wrap" id="pyr-chart"><div class="pyr3d" id="pyr3d" tabindex="0" aria-label="${pyramidDescription(r.scores, r.total, L, DIM_ORDER)}。可左右拖动旋转，或用左右方向键。"></div>${levelLegend()}<p class="drag-tip" aria-hidden="true">← 左右拖动，转着看 →</p></div>
     </section>
 
     <section class="section" aria-labelledby="h-rad">
@@ -216,7 +206,7 @@ function renderResult() {
 
     <section class="section" aria-labelledby="h-prac">
       <h2 id="h-prac">接下来怎么做</h2>
-      ${recommendation(r)}
+      ${recoHTML(M.recommendation)}
       <div class="card">
         <h3>7天自我练习 · ${DIMS[L].name}</h3>
         <p>这7天，每天对自己说（或写下）这一句：</p>
@@ -237,10 +227,17 @@ function renderResult() {
     </section>
 
     <section class="talk" aria-labelledby="h-talk">
-      <h2 id="h-talk" style="font-size:20px;margin-bottom:6px">想有人陪你聊聊？</h2>
-      <p>有些事，一个人想很久也转不出来，说出来会轻一些。</p>
-      <button class="btn small" id="talk">了解更多</button>
+      <h2 id="h-talk">${TALK.title}</h2>
+      ${TALK.lines.map((t) => `<p>${t}</p>`).join("")}
+      <button class="qr-thumb" id="talk" aria-label="点开放大二维码"><img src="./${QR_PATH}" alt="翔叔的微信二维码" width="832" height="1114" loading="lazy" decoding="async"></button>
+      <p class="qr-note">${TALK.note}　<span>${TALK.hint}</span></p>
+      <button class="btn small" id="talk2">放大二维码</button>
     </section>
+
+    <div class="save-box">
+      <button class="btn" id="save-img">保存完整报告图</button>
+      <p class="save-hint" id="save-hint">把整份报告存成一张长图，方便留着看或发给信任的人。</p>
+    </div>
 
     <div class="end-actions">
       <button class="btn ghost" id="retake">重新测一次</button>
@@ -248,11 +245,17 @@ function renderResult() {
     </div>
     <p class="footnote">结果只保存在你这台设备的浏览器里，没有上传到任何地方。<br>${FOOTER_NOTE}</p>
     <dialog id="dlg" aria-labelledby="dlg-t">
-      <h2 id="dlg-t">敬请期待</h2>
-      <p>我们正在准备这些温和的陪伴方式：</p>
-      <ul><li>一对一陪谈</li><li>导师匹配</li><li>后续课程</li></ul>
-      <p style="font-size:14px;color:var(--ink-2)">现在还没有开放，也不需要你留下任何信息。</p>
+      <h2 id="dlg-t">${TALK.title}</h2>
+      <p>${TALK.lines[1]}</p>
+      <img class="qr-big" src="./${QR_PATH}" alt="翔叔的微信二维码" width="832" height="1114">
+      <p class="qr-note"><b>${TALK.note}</b><br><span>手机上请长按图片；电脑上用微信扫一扫。</span></p>
       <button class="btn block small" id="dlg-x">好的</button>
+    </dialog>
+    <dialog id="img-dlg" class="img-dlg" aria-labelledby="img-t">
+      <h2 id="img-t">完整报告图</h2>
+      <p class="img-tip" id="img-tip"><b>长按下面的图片</b>，选“保存到相册”或“保存图片”。</p>
+      <div class="img-scroll"><img id="out-img" alt="珍爱金字塔完整报告长图"></div>
+      <div class="img-actions"><a class="btn small" id="dl-link" download>下载图片</a><button class="btn ghost small" id="img-x">关闭</button></div>
     </dialog>
   </main>`, "h1");
 
@@ -261,9 +264,46 @@ function renderResult() {
     if (k >= 0) state.practice.splice(k, 1); else state.practice.push(d);
     b.setAttribute("aria-pressed", String(state.practice.includes(d))); persist();
   }));
+  const reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  mountPyramid3D(document.getElementById("pyr3d"), { scores: r.scores, total: r.total, lowest: L }, { reduced, label: pyramidDescription(r.scores, r.total, L, DIM_ORDER) });
+  const openDlg = (d) => (d.showModal ? d.showModal() : d.setAttribute("open", ""));
+  const closeDlg = (d) => (d.close ? d.close() : d.removeAttribute("open"));
   const dlg = document.getElementById("dlg");
-  document.getElementById("talk").addEventListener("click", () => (dlg.showModal ? dlg.showModal() : dlg.setAttribute("open", "")));
-  document.getElementById("dlg-x").addEventListener("click", () => (dlg.close ? dlg.close() : dlg.removeAttribute("open")));
+  document.getElementById("talk").addEventListener("click", () => openDlg(dlg));
+  document.getElementById("talk2").addEventListener("click", () => openDlg(dlg));
+  document.getElementById("dlg-x").addEventListener("click", () => closeDlg(dlg));
+  const idlg = document.getElementById("img-dlg");
+  document.getElementById("img-x").addEventListener("click", () => closeDlg(idlg));
+  idlg.addEventListener("close", () => { const u = idlg.dataset.url; if (u) { URL.revokeObjectURL(u); delete idlg.dataset.url; } });
+  const saveBtn = document.getElementById("save-img"), hint = document.getElementById("save-hint");
+  saveBtn.addEventListener("click", async () => {
+    if (saveBtn.disabled) return;
+    saveBtn.disabled = true; const old = saveBtn.textContent; saveBtn.textContent = "正在生成……";
+    hint.textContent = "正在把整份报告画成一张图，稍等几秒。";
+    try {
+      const now = new Date();
+      const out = await renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: L, highest: H },
+        { date: fmtDate(now), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2 });
+      const url = out.blob ? URL.createObjectURL(out.blob) : out.dataURL;
+      if (out.blob) idlg.dataset.url = url;
+      const img = document.getElementById("out-img"), a = document.getElementById("dl-link");
+      img.src = url; a.href = url; a.download = fileNameFor(now);
+      img.dataset.w = out.width; img.dataset.h = out.height;
+      await img.decode().catch(() => {});
+      openDlg(idlg);
+      // 桌面浏览器直接触发下载；手机/微信里只弹预览让用户长按保存
+      const coarse = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+      const ua = navigator.userAgent || "";
+      const inApp = /MicroMessenger|iPhone|iPad|iPod|Android|Mobile/i.test(ua) || coarse || (navigator.maxTouchPoints > 0 && window.innerWidth < 820);
+      document.getElementById("img-tip").innerHTML = inApp ? "<b>长按下面的图片</b>，选“保存到相册”或“保存图片”。" : "已为你下载图片；没有自动下载的话，点“下载图片”，或在图上右键另存为。";
+      if (!inApp) a.click();
+      hint.textContent = "已生成。再点一次可重新生成。";
+    } catch (e) {
+      console.error(e);
+      hint.textContent = "这次没生成成功，请再点一次试试；还不行的话可以截屏保存。";
+      toast("生成失败了，再试一次吧");
+    } finally { saveBtn.disabled = false; saveBtn.textContent = old; }
+  });
   document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果，确定吗？")) { resetAnswers(); renderTips(); } });
   document.getElementById("tohome").addEventListener("click", renderHome);
 }
