@@ -29,7 +29,7 @@ jobs:
       - name: 组装静态文件
         run: |
           mkdir dist
-          cp -r index.html css js dist/
+          cp -r index.html css js assets dist/
           touch dist/.nojekyll
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
