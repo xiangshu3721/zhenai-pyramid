@@ -440,6 +440,7 @@
     function isRow(el, cs) {
       if (!/flex|grid/.test(cs.display)) return null;
       var kids = [], total = 0;
+      for (var tn = el.firstChild; tn; tn = tn.nextSibling) { if (tn.nodeType === 3 && /\S/.test(tn.nodeValue)) return null; }
       for (var c = el.firstElementChild; c; c = c.nextElementSibling) {
         if (matches(c, skip)) continue;
         var ccs = getComputedStyle(c); if (!shown(c, ccs)) continue;
@@ -488,9 +489,12 @@
         if (tag === "dl") {
           flush();
           var drows = [], dt = "";
-          for (var d = n.firstElementChild; d; d = d.nextElementSibling) {
+          var dds = n.querySelectorAll("dt,dd");
+          for (var di = 0; di < dds.length; di++) {
+            var d = dds[di];
+            if (matches(d, skip)) continue;
             if (d.tagName === "DT") dt = inlineText(d);
-            else if (d.tagName === "DD") { drows.push([dt, inlineText(d)]); dt = ""; }
+            else { drows.push([dt, inlineText(d)]); dt = ""; }
           }
           if (drows.length) out.push({ t: "table", r: drows, hd: 0, kv: 1 });
           continue;
@@ -965,6 +969,7 @@
     clear: clearAll,
     remove: removeOne,
     lastSave: function () { return lastSave; },
+    refreshSections: function () { if (lastSave && lastSave.id) scheduleCapture(lastSave.id); },
     ensureNick: ensureNick,
     closeNick: closeNick,
     guard: guard,
