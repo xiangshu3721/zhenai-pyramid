@@ -10,6 +10,16 @@ const sizes = [{ name: "m390", width: 390, height: 844, mobile: true }, { name: 
 const fail = [];
 const check = (c, msg) => { if (!c) { fail.push(msg); console.log("  FAIL:", msg); } else console.log("  ok:", msg); };
 const browser = await chromium.launch();
+// 昵称门槛：开始前要先录昵称。这个小函数在弹出昵称框时填上并确认。
+const nickGo = async (page, name = "测试者") => {
+  await page.waitForSelector(".rk-nick");
+  await page.fill(".rk-nick input", "");
+  check(await page.locator("[data-rk-nick-go]").isDisabled(), "昵称为空时「开始测评」不可用");
+  await page.fill(".rk-nick input", "   ");
+  check(await page.locator("[data-rk-nick-go]").isDisabled(), "纯空格也不可用");
+  await page.fill(".rk-nick input", name);
+  await page.click("[data-rk-nick-go]");
+};
 for (const sz of sizes) {
   console.log(`== ${sz.name} ==`);
   const ctx = await browser.newContext({ viewport: { width: sz.width, height: sz.height }, deviceScaleFactor: sz.mobile ? 2 : 1, isMobile: sz.mobile, hasTouch: sz.mobile, locale: "zh-CN", ...(sz.mobile ? { userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1" } : {}) });
@@ -31,6 +41,7 @@ for (const sz of sizes) {
   await shot("01-home");
   await shot("01-home-full", { fullPage: true });
   await page.click("#start");
+  await nickGo(page);
   await page.waitForSelector("#go");
   check((await page.locator("main").innerText()).includes("最近一个月"), "答题提示页");
   await shot("02-tips");
@@ -147,6 +158,7 @@ for (const sz of sizes) {
   await page.click("#viewlast");
   await page.waitForSelector("#retake");
   await page.click("#retake");
+  await nickGo(page);
   await page.waitForSelector("#go");
   check(true, "重新测一次回到提示页");
   // 外部请求检查
