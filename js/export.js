@@ -129,7 +129,7 @@ function cardTitle(p, y, title, tag, tagKind) {
   return y + 50;
 }
 
-export async function renderReportImage(model, { date, qrSrc, scale = 2, view = DEFAULT_VIEW } = {}) {
+export async function renderReportImage(model, { date, qrSrc, scale = 2, view = DEFAULT_VIEW, nick = "" } = {}) {
   const [qr, pyr, rad] = await Promise.all([
     loadImage(qrSrc),
     svgImage(pyramid3dSVG(model.scores, model.total, model.lowest, view, { size: [640, 646], font: SANS })),
@@ -149,6 +149,8 @@ export async function renderReportImage(model, { date, qrSrc, scale = 2, view = 
     y += 74;
     if (p.draw) { c.fillStyle = C.line; c.fillRect(M, y, CW, 2); c.fillStyle = C.seal; c.fillRect(M, y, 90, 2); }
     y += 28;
+    p.text(`${nick || "匿名"} 的测评结果`, M, y + 26, { size: 28, bold: true, serif: true, color: C.seal });
+    y += 52;
     y = p.para(model.title, y, { size: 36, bold: true, serif: true, lh: 54 });
     y += 14;
     y = p.para(model.opening, y, { size: 24, serif: true, lh: 44 });

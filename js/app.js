@@ -55,8 +55,27 @@ function summaryOf(answers) {
     notes: [`你的资源：${DIMS[H].name}。${DIM_TEXT[H].resource}`, `最该先照顾：${DIMS[L].name}。${T.need}`, `7 天小练习：${T.sentence}`],
   };
 }
-function startOver() { resetAnswers(); renderTips(); }
-if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", onRestart: startOver });
+function startOver() { if (RK) RK.nickReset(); resetAnswers(); renderTips(); }
+/* 历史记录里导出：用当时的答案重新画同一张完整报告长图（含昵称）；旧记录没存答案时返回 false，走通用摘要图 */
+function exportFromRecord(rec) {
+  const d = rec && rec.d;
+  if (!d || !Array.isArray(d.a) || d.a.length !== 36 || !isComplete(d.a)) return false;
+  const when = new Date(rec.t);
+  (async () => {
+    RK.toast("正在生成图片……");
+    try {
+      const out = await makeReport(d.a, Array.isArray(d.p) ? d.p : [], rec.nick || "", when);
+      RK.showImages([out.blob ? URL.createObjectURL(out.blob) : out.dataURL], fileNameFor(when));
+    } catch (e) { console.error(e); RK.toast("这台设备没能生成图片，可以直接截屏保存。"); }
+  })();
+}
+async function makeReport(answers, practice, nick, when) {
+  const r = computeResult(answers);
+  const M = buildReport(r, practice);
+  return renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: r.lowest, highest: r.highest },
+    { date: fmtDate(when), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2, nick });
+}
+if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", onRestart: startOver, exporter: exportFromRecord });
 
 /* ---------- 首页 ---------- */
 function heroPyramid() {
@@ -91,9 +110,10 @@ function renderHome() {
     <p class="footnote">${FOOTER_NOTE}</p>
   </main>`, "h1");
   const on = (id, fn) => { const b = document.getElementById(id); if (b) b.addEventListener("click", fn); };
-  on("start", () => { resetAnswers(); renderTips(); });
-  on("restart", () => { if (confirm("重新开始会清除已答的内容，确定吗？")) { resetAnswers(); renderTips(); } });
-  on("resume", () => { renderQuestion(state.idx); });
+  const gate = (fn) => (RK ? RK.ensureNick(fn) : fn());
+  on("start", () => gate(() => { resetAnswers(); renderTips(); }));
+  on("restart", () => { if (confirm("重新开始会清除已答的内容，确定吗？")) { if (RK) RK.nickReset(); gate(() => { resetAnswers(); renderTips(); }); } });
+  on("resume", () => gate(() => renderQuestion(state.idx)));
   on("viewlast", () => renderResult());
 }
 function resetAnswers() {
@@ -104,6 +124,7 @@ function resetAnswers() {
 
 /* ---------- 答题提示 ---------- */
 function renderTips() {
+  if (RK) RK.guard(true, renderHome);
   state.stage = "tips"; persist();
   mount(`
   <main class="tips">
@@ -122,6 +143,7 @@ function renderTips() {
 
 /* ---------- 答题 ---------- */
 function renderQuestion(i) {
+  if (RK) RK.guard(true, renderHome);
   clearTimeout(advanceTimer);
   i = Math.max(0, Math.min(35, i));
   state.stage = "quiz"; state.idx = i; persist();
@@ -181,7 +203,7 @@ function finish() {
     notice = null; toast(`第 ${miss + 1} 题还没答，先补上哦`); renderQuestion(miss); return;
   }
   state.done = state.answers.slice(); state.stage = "result"; persist();
-  try { if (RK) RK.save(summaryOf(state.done)); } catch (e) { console.error(e); }
+  try { if (RK) RK.save(summaryOf(state.done), { data: { a: state.done.slice(), p: state.practice.slice() } }); } catch (e) { console.error(e); }
   renderResult();
 }
 
@@ -311,7 +333,7 @@ function renderResult() {
     try {
       const now = new Date();
       const out = await renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: L, highest: H },
-        { date: fmtDate(now), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2 });
+        { date: fmtDate(now), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2, nick: RK ? RK.nick.get() : "" });
       const url = out.blob ? URL.createObjectURL(out.blob) : out.dataURL;
       if (out.blob) idlg.dataset.url = url;
       const img = document.getElementById("out-img"), a = document.getElementById("dl-link");
@@ -332,7 +354,7 @@ function renderResult() {
       toast("生成失败了，再试一次吧");
     } finally { saveBtn.disabled = false; saveBtn.textContent = old; }
   });
-  document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果（已保存的历史记录不受影响），确定吗？")) { resetAnswers(); renderTips(); } });
+  document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果（已保存的历史记录不受影响），确定吗？")) { if (RK) RK.nickReset(); resetAnswers(); renderTips(); } });
   document.getElementById("tohome").addEventListener("click", renderHome);
 }
 
