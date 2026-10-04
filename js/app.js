@@ -75,7 +75,7 @@ async function makeReport(answers, practice, nick, when) {
   return renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: r.lowest, highest: r.highest },
     { date: fmtDate(when), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2, nick });
 }
-if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", onRestart: startOver, exporter: exportFromRecord });
+if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", start: ["#start", "#resume"], onRestart: startOver, exporter: exportFromRecord });
 
 /* ---------- 首页 ---------- */
 function heroPyramid() {
