@@ -8,6 +8,7 @@ import { renderReportImage, fmtDate, fileNameFor } from "./export.js";
 import * as store from "./storage.js";
 
 const app = document.getElementById("app");
+const RK = window.ResultKit;
 let state;
 let notice = null;
 let advanceTimer = null;
@@ -33,6 +34,30 @@ const noticeHTML = () => {
   return n ? `<div class="banner" role="status">${esc(n)}</div>` : "";
 };
 
+/* ---------- 历史记录 / 导出图片（共用 result-kit.js）---------- */
+function summaryOf(answers) {
+  const r = computeResult(answers);
+  const L = r.lowest, H = r.highest, T = DIM_TEXT[L];
+  const M = buildReport(r, []);
+  const tone = (id) => (id === "care" ? "high" : id === "repair" ? "mid" : "ok");
+  return {
+    headline: `最薄的一层是「${DIMS[L].name}」`,
+    sub: M.opening,
+    metrics: [
+      { label: "加权总分（参考）", value: `${r.total} · ${r.totalLevel.name}`, frac: r.total / 100, tone: tone(r.totalLevel.id) },
+      ...[...DIM_ORDER].sort((a, b) => r.scores[b] - r.scores[a]).map((k) => ({
+        label: `${DIMS[k].name}${k === L ? " · 漏" : ""}`,
+        value: `${r.scores[k]} 分 · ${r.levels[k].name}`,
+        frac: r.scores[k] / 100,
+        tone: tone(r.levels[k].id),
+      })),
+    ],
+    notes: [`你的资源：${DIMS[H].name}。${DIM_TEXT[H].resource}`, `最该先照顾：${DIMS[L].name}。${T.need}`, `7 天小练习：${T.sentence}`],
+  };
+}
+function startOver() { resetAnswers(); renderTips(); }
+if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", onRestart: startOver });
+
 /* ---------- 首页 ---------- */
 function heroPyramid() {
   return `<svg class="hero-pyr" viewBox="0 0 92 80" aria-hidden="true"><path d="M46 4 L88 76 H4 Z" fill="none" stroke="#2A2521" stroke-width="1.4" stroke-linejoin="round"/><path d="M26 41 H66" stroke="#2A2521" stroke-width="1"/><path d="M46 4 V76" stroke="#2A2521" stroke-width=".6" stroke-dasharray="2 3"/><circle cx="46" cy="52" r="6" fill="#A8432F"/></svg>`;
@@ -55,6 +80,7 @@ function renderHome() {
       ${resume ? `<button class="btn" id="resume">继续上次答题（已答 ${n}/36）</button><button class="btn ghost" id="restart">重新开始</button>` : ""}
       ${hasDone ? `<button class="btn" id="viewlast">查看上次的结果</button><button class="btn ghost" id="start">重新测一次</button>` : ""}
       ${!resume && !hasDone ? `<button class="btn" id="start">开始</button>` : ""}
+      ${RK ? RK.historyButton({ className: "btn ghost", always: true }) : ""}
     </div>
     <section class="concepts" aria-labelledby="ch">
       <h2 id="ch">先说清四个词</h2>
@@ -155,6 +181,7 @@ function finish() {
     notice = null; toast(`第 ${miss + 1} 题还没答，先补上哦`); renderQuestion(miss); return;
   }
   state.done = state.answers.slice(); state.stage = "result"; persist();
+  try { if (RK) RK.save(summaryOf(state.done)); } catch (e) { console.error(e); }
   renderResult();
 }
 
@@ -239,6 +266,7 @@ function renderResult() {
       <p class="save-hint" id="save-hint">把整份报告存成一张长图，方便留着看或发给信任的人。</p>
     </div>
 
+    ${RK ? RK.bar(summaryOf(state.done), { restart: false, export: false }) : ""}
     <div class="end-actions">
       <button class="btn ghost" id="retake">重新测一次</button>
       <button class="btn ghost" id="tohome">回到首页</button>
@@ -304,7 +332,7 @@ function renderResult() {
       toast("生成失败了，再试一次吧");
     } finally { saveBtn.disabled = false; saveBtn.textContent = old; }
   });
-  document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果，确定吗？")) { resetAnswers(); renderTips(); } });
+  document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果（已保存的历史记录不受影响），确定吗？")) { resetAnswers(); renderTips(); } });
   document.getElementById("tohome").addEventListener("click", renderHome);
 }
 
