@@ -3,7 +3,7 @@ import { computeResult, isComplete, levelOf } from "./scoring.js";
 import { DIM_TEXT, RELATION_TEXT, GENERIC_RELATION, FOOTER_NOTE } from "./content.js";
 import { radarSVG, LEVEL_COLOR } from "./charts.js";
 import { mountPyramid3D, pyramidDescription } from "./pyramid3d.js";
-import { buildReport, TALK, QR_PATH } from "./report.js";
+import { buildReport } from "./report.js";
 import { renderReportImage, fmtDate, fileNameFor } from "./export.js";
 import * as store from "./storage.js";
 
@@ -73,7 +73,7 @@ async function makeReport(answers, practice, nick, when) {
   const r = computeResult(answers);
   const M = buildReport(r, practice);
   return renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: r.lowest, highest: r.highest },
-    { date: fmtDate(when), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2, nick });
+    { date: fmtDate(when), scale: 2, nick });
 }
 if (RK) RK.configure({ id: "zhenai", title: "珍爱金字塔 · 自我关系状态评估", start: ["#start", "#resume"], onRestart: startOver, exporter: exportFromRecord });
 
@@ -275,14 +275,6 @@ function renderResult() {
       </ul>
     </section>
 
-    <section class="talk" aria-labelledby="h-talk">
-      <h2 id="h-talk">${TALK.title}</h2>
-      ${TALK.lines.map((t) => `<p>${t}</p>`).join("")}
-      <button class="qr-thumb" id="talk" aria-label="点开放大二维码"><img src="./${QR_PATH}" alt="翔叔的微信二维码" width="832" height="1114" loading="lazy" decoding="async"></button>
-      <p class="qr-note">${TALK.note}　<span>${TALK.hint}</span></p>
-      <button class="btn small" id="talk2">放大二维码</button>
-    </section>
-
     <div class="save-box">
       <button class="btn" id="save-img">保存完整报告图</button>
       <p class="save-hint" id="save-hint">把整份报告存成一张长图，方便留着看或发给信任的人。</p>
@@ -294,13 +286,6 @@ function renderResult() {
       <button class="btn ghost" id="tohome">回到首页</button>
     </div>
     <p class="footnote">结果只保存在你这台设备的浏览器里，没有上传到任何地方。<br>${FOOTER_NOTE}</p>
-    <dialog id="dlg" aria-labelledby="dlg-t">
-      <h2 id="dlg-t">${TALK.title}</h2>
-      <p>${TALK.lines[1]}</p>
-      <img class="qr-big" src="./${QR_PATH}" alt="翔叔的微信二维码" width="832" height="1114">
-      <p class="qr-note"><b>${TALK.note}</b><br><span>手机上请长按图片；电脑上用微信扫一扫。</span></p>
-      <button class="btn block small" id="dlg-x">好的</button>
-    </dialog>
     <dialog id="img-dlg" class="img-dlg" aria-labelledby="img-t">
       <h2 id="img-t">完整报告图</h2>
       <p class="img-tip" id="img-tip"><b>长按下面的图片</b>，选“保存到相册”或“保存图片”。</p>
@@ -318,10 +303,6 @@ function renderResult() {
   mountPyramid3D(document.getElementById("pyr3d"), { scores: r.scores, total: r.total, lowest: L }, { reduced, label: pyramidDescription(r.scores, r.total, L, DIM_ORDER) });
   const openDlg = (d) => (d.showModal ? d.showModal() : d.setAttribute("open", ""));
   const closeDlg = (d) => (d.close ? d.close() : d.removeAttribute("open"));
-  const dlg = document.getElementById("dlg");
-  document.getElementById("talk").addEventListener("click", () => openDlg(dlg));
-  document.getElementById("talk2").addEventListener("click", () => openDlg(dlg));
-  document.getElementById("dlg-x").addEventListener("click", () => closeDlg(dlg));
   const idlg = document.getElementById("img-dlg");
   document.getElementById("img-x").addEventListener("click", () => closeDlg(idlg));
   idlg.addEventListener("close", () => { const u = idlg.dataset.url; if (u) { URL.revokeObjectURL(u); delete idlg.dataset.url; } });
@@ -333,7 +314,7 @@ function renderResult() {
     try {
       const now = new Date();
       const out = await renderReportImage({ ...M, scores: r.scores, total: r.total, lowest: L, highest: H },
-        { date: fmtDate(now), qrSrc: new URL(`./${QR_PATH}`, document.baseURI).href, scale: 2, nick: RK ? RK.nick.get() : "" });
+        { date: fmtDate(now), scale: 2, nick: RK ? RK.nick.get() : "" });
       const url = out.blob ? URL.createObjectURL(out.blob) : out.dataURL;
       if (out.blob) idlg.dataset.url = url;
       const img = document.getElementById("out-img"), a = document.getElementById("dl-link");

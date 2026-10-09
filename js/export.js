@@ -1,4 +1,4 @@
-// 导出完整报告长图：纯 canvas 2D 手绘 + 内嵌 SVG（雷达图 / 3D 金字塔静态版）+ 二维码图片。
+// 导出完整报告长图：纯 canvas 2D 手绘 + 内嵌 SVG（雷达图 / 3D 金字塔静态版）。
 // 无外部库、无外部请求；不依赖 CSS 3D / foreignObject，iOS Safari、微信内置浏览器都能画。
 import { pyramid3dSVG, DEFAULT_VIEW } from "./pyramid3d.js";
 import { radarSVG, LEVEL_COLOR } from "./charts.js";
@@ -129,9 +129,8 @@ function cardTitle(p, y, title, tag, tagKind) {
   return y + 50;
 }
 
-export async function renderReportImage(model, { date, qrSrc, scale = 2, view = DEFAULT_VIEW, nick = "" } = {}) {
-  const [qr, pyr, rad] = await Promise.all([
-    loadImage(qrSrc),
+export async function renderReportImage(model, { date, scale = 2, view = DEFAULT_VIEW, nick = "" } = {}) {
+  const [pyr, rad] = await Promise.all([
     svgImage(pyramid3dSVG(model.scores, model.total, model.lowest, view, { size: [640, 646], font: SANS })),
     svgImage(radarSVG(model.scores, model.lowest, model.highest, { size: [640, 560], font: SANS })),
   ]);
@@ -255,27 +254,6 @@ export async function renderReportImage(model, { date, qrSrc, scale = 2, view = 
         return pp.para(`${d.sub}　${d.desc}`, yy, { x: M + 26, w: CW - 52, size: 19, color: C.ink2, lh: 32 });
       });
       y += 14;
-    }
-    // ---- 二维码 ----
-    y += 24;
-    {
-      const t = model.talk;
-      if (p.draw) { c.fillStyle = C.line; c.fillRect(M, y, CW, 1.5); }
-      y += 44;
-      p.text(t.title, W / 2, y + 30, { size: 34, bold: true, serif: true, align: "center" });
-      y += 56;
-      for (const ln of t.lines) y = p.para(ln, y + 4, { x: M + 20, w: CW - 40, size: 23, lh: 40, color: C.ink2, align: "center" });
-      y += 22;
-      const qw = 420, qh = Math.round(qw * qr.naturalHeight / qr.naturalWidth), bx = (W - qw) / 2;
-      p.rrect(bx - 14, y - 14, qw + 28, qh + 28, 22, { fill: "#fff", stroke: C.line, lw: 1.5 });
-      if (p.draw) c.drawImage(qr, bx, y, qw, qh);
-      y += qh + 28 + 20;
-      p.text(t.note, W / 2, y + 22, { size: 24, bold: true, color: C.seal, align: "center" });
-      y += 48;
-      p.text(t.hint, W / 2, y + 20, { size: 19, color: C.ink2, align: "center" });
-      y += 36;
-      if (p.draw) { c.fillStyle = C.line; c.fillRect(M, y + 10, CW, 1.5); }
-      y += 24;
     }
     // ---- 尾部 ----
     for (const t of model.footer) y = p.para(t, y + 6, { size: 19, color: C.ink2, lh: 32, align: "center" });

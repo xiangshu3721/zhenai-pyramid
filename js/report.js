@@ -2,15 +2,6 @@
 import { DIMS, DIM_ORDER, LEVELS } from "./data.js";
 import { DIM_TEXT, RELATION_TEXT, GENERIC_RELATION, FOOTER_NOTE } from "./content.js";
 
-export const TALK = {
-  title: "想有人陪你聊聊？",
-  lines: ["有些事，一个人想很久也转不出来，说出来会轻一些。", "扫码加翔叔微信，说一句“珍爱金字塔”，我看到会回你。"],
-  note: "长按识别二维码",
-  hint: "只是聊聊，不收费、不推销。",
-};
-export const QR_PATH = "assets/wechat-qr.png";
-export const QR_SIZE = { w: 832, h: 1114 };
-
 /** 带 <em> 的开场白（HTML 用；导出时把 em 当作强调色） */
 export function openingText(r) {
   const H = DIMS[r.highest].name, L = DIMS[r.lowest].name;
@@ -52,7 +43,6 @@ export function buildReport(r, practice = []) {
     practice: { title: `7天自我练习 · ${DIMS[L].name}`, intro: "这7天，每天对自己说（或写下）这一句：", sentence: `“${T.sentence}”`, how: T.how, done: practice.slice(), note: "点一下就算打卡，只记在你自己的手机里。" },
     dims: [...DIM_ORDER].sort((a, b) => r.scores[b] - r.scores[a]).map((k) => ({
       key: k, name: DIMS[k].name + (k === L ? " · 漏" : ""), score: r.scores[k], levelId: r.levels[k].id, levelName: r.levels[k].name, sub: DIMS[k].sub, desc: r.levels[k].desc, leak: k === L })),
-    talk: TALK,
     footer: ["结果只保存在你这台设备的浏览器里，没有上传到任何地方。", FOOTER_NOTE],
   };
 }

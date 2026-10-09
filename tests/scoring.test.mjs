@@ -118,7 +118,7 @@ t("关联规则触发", () => {
 
 /* ---------- 3D 金字塔 / 报告模型 ---------- */
 import { buildScene, pyramid3dSVG, DEFAULT_VIEW, YAW_LIMIT } from "../js/pyramid3d.js";
-import { buildReport, TALK, QR_PATH } from "../js/report.js";
+import { buildReport } from "../js/report.js";
 import fs from "node:fs";
 
 const SC = { A: 70, B: 30, C: 55, D: 85, E: 45, F: 62 };
@@ -154,7 +154,7 @@ t("3D 金字塔：分级配色与 levelOf 一致（优先照顾=赭红 / 稳定=
   assert.ok(svgLow.includes("rgb(") && svgHigh.includes("rgb("));
   assert.notEqual(svgLow, svgHigh);
 });
-t("报告模型：与计分一致，含全部板块与二维码文案", () => {
+t("报告模型：与计分一致，含全部板块", () => {
   const ans = Array(36).fill(3); ans[0] = 5; ans[5] = 1;
   const r = computeResult(ans);
   const m = buildReport(r, [1, 3]);
@@ -166,10 +166,10 @@ t("报告模型：与计分一致，含全部板块与二维码文案", () => {
   assert.ok(m.relations.length >= 1);
   assert.ok(m.recommendation.paras.length >= 1);
   assert.ok(m.footer.join("").includes("不是医学或心理诊断"));
-  assert.ok(TALK.lines.join("").includes("珍爱金字塔") && TALK.note.includes("长按识别二维码"));
+  assert.ok(!("talk" in m), "报告模型不含微信引导 talk");
 });
-t("二维码图片已入库，且是 PNG、大小合理", () => {
-  const b = fs.readFileSync(new URL("../" + QR_PATH, import.meta.url));
+t("仓库可保留 wechat-qr.png 资源文件（页面已不再引用）", () => {
+  const b = fs.readFileSync(new URL("../assets/wechat-qr.png", import.meta.url));
   assert.equal(b.slice(1, 4).toString(), "PNG");
   assert.ok(b.length > 20000 && b.length < 600000, "size " + b.length);
 });

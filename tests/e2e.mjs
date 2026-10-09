@@ -83,7 +83,7 @@ for (const sz of sizes) {
   await page.waitForSelector("#pyr-chart svg");
   await page.waitForTimeout(500);
   const rep = await page.locator("main").innerText();
-  check(rep.includes("漏能量层") && rep.includes("加权总分") && rep.includes("7天自我练习") && rep.includes("想有人陪你聊聊？"), "报告关键板块");
+  check(rep.includes("漏能量层") && rep.includes("加权总分") && rep.includes("7天自我练习") && !rep.includes("想有人陪你聊聊？") && !rep.includes("扫码加翔叔微信"), "报告关键板块且无微信引导");
   check(rep.includes("不是医学或心理诊断"), "页脚声明");
   const svgs = await page.evaluate(() => [...document.querySelectorAll(".chart svg")].map((s) => { const b = s.getBoundingClientRect(); return { w: b.width, h: b.height, polys: s.querySelectorAll("polygon,path").length, texts: s.querySelectorAll("text").length }; }));
   check(svgs.length === 2 && svgs.every((s) => s.w > 250 && s.h > 200 && s.polys > 5 && s.texts >= 6), "3D 金字塔与雷达图渲染 " + JSON.stringify(svgs));
@@ -117,18 +117,10 @@ for (const sz of sizes) {
   await page.locator("#h-rad").scrollIntoViewIfNeeded();
   await page.locator("#h-rad").locator("xpath=..").screenshot({ path: path.join(outDir, `${sz.name}-07-result-radar.png`) });
   await shot("08-result-full", { fullPage: true });
-  // 二维码区块 + 弹层
-  await page.locator(".talk").scrollIntoViewIfNeeded();
-  check(!(await page.locator(".talk").innerText()).includes("敬请期待"), "无“敬请期待”占位");
-  const qrOK = await page.locator(".talk img").evaluate((im) => im.complete && im.naturalWidth > 500);
-  check(qrOK, "结果页二维码图片加载成功");
-  await page.locator(".talk").screenshot({ path: path.join(outDir, `${sz.name}-09a-talk-section.png`) });
-  await page.click("#talk");
-  check(await page.locator("dialog#dlg[open]").count() === 1, "二维码弹层可打开");
-  check((await page.locator("dialog#dlg[open]").innerText()).includes("长按识别二维码"), "弹层含“长按识别二维码”");
-  await page.waitForTimeout(300);
-  await page.locator("dialog#dlg[open]").screenshot({ path: path.join(outDir, `${sz.name}-09-qr-dialog.png`) });
-  await page.click("#dlg-x");
+  // 已去掉微信二维码引导
+  check(await page.locator(".talk").count() === 0, "结果页无.talk 二维码区块");
+  check(await page.locator("dialog#dlg").count() === 0, "无二维码弹层");
+  check(!reqs.some((u) => /wechat-qr|qr\.(png|jpg|jpeg|webp)/i.test(u)), "无二维码图片网络请求");
   await page.click(".day[data-d='1']");
   check(await page.locator(".day[aria-pressed=true]").count() === 1, "7天打卡可点");
   // 导出长图
