@@ -1,4 +1,4 @@
-// 本机存储：仅 localStorage，不上传任何数据。不可用时降级为内存。
+// 本机进度：仅 localStorage。结果短链在 cloud-share.js，不经过这里。不可用时降级为内存。
 const KEY = "zhenai-pyramid:v1";
 let mem = null;
 export let storageOK = true;

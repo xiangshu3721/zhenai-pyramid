@@ -326,7 +326,7 @@
     el.className = "rk-nickf" + (opts.bar ? " rk-inbar" : ""); el.setAttribute("data-rk-skip", "");
     el.innerHTML = '<label class="nf-f"><span class="nf-t">先告诉我怎么称呼你</span>' +
       '<input type="text" maxlength="12" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" placeholder="你的昵称（1–12 个字）" aria-label="你的昵称（1–12 个字）" data-rk-nick-input></label>' +
-      '<p class="nf-note">昵称会写在你的结果和导出的图片上，只存在这台设备里，不会上传。</p>' +
+      '<p class="nf-note">昵称会写在你的结果和导出的图片上，也会出现在阅读链接里。</p>' +
       '<p class="nf-hint" data-rk-nick-hint role="status" aria-live="polite"></p>' +
       (opts.bar ? '<div class="nf-row">' + (typeof opts.onCancel === "function" ? '<button type="button" class="rk-btn" data-rk-nick-back>返回</button>' : "") + '<button type="button" class="rk-btn primary" data-rk-nick-go disabled>开始测评</button></div>' : "");
     var inp = el.querySelector("input"), hint = el.querySelector("[data-rk-nick-hint]");

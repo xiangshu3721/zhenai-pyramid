@@ -5,6 +5,7 @@ import { radarSVG, LEVEL_COLOR } from "./charts.js";
 import { mountPyramid3D, pyramidDescription } from "./pyramid3d.js";
 import { buildReport } from "./report.js";
 import { renderReportImage, fmtDate, fileNameFor } from "./export.js";
+import { mountZhenaiCloud } from "./cloud-share.js";
 import * as store from "./storage.js";
 
 const app = document.getElementById("app");
@@ -93,7 +94,7 @@ function renderHome() {
     <p class="sub">看见哪一层在漏能量</p>
     ${heroPyramid()}
     <p class="lede">这不是在诊断你有没有心理问题，而是看见：你与自己、生活、情绪和他人的关系，哪一层正在漏能量。</p>
-    <p class="meta"><span>共 36 题</span><span>约 5–7 分钟</span><span>结果只存在你的手机里</span></p>
+    <p class="meta"><span>共 36 题</span><span>约 5–7 分钟</span><span>答题进度留在这台手机</span></p>
     ${noticeHTML()}
     <div class="home-actions" style="margin-top:18px">
       ${resume ? `<button class="btn" id="resume">继续上次答题（已答 ${n}/36）</button><button class="btn ghost" id="restart">重新开始</button>` : ""}
@@ -280,12 +281,13 @@ function renderResult() {
       <p class="save-hint" id="save-hint">把整份报告存成一张长图，方便留着看或发给信任的人。</p>
     </div>
 
+    <div class="za-share" data-cloud-slot data-rk-skip></div>
     ${RK ? RK.bar(summaryOf(state.done), { restart: false, export: false }) : ""}
     <div class="end-actions">
       <button class="btn ghost" id="retake">重新测一次</button>
       <button class="btn ghost" id="tohome">回到首页</button>
     </div>
-    <p class="footnote">结果只保存在你这台设备的浏览器里，没有上传到任何地方。<br>${FOOTER_NOTE}</p>
+    <p class="footnote">进入结果页后会准备一条阅读链接，点「分享结果」才会复制。7 天打卡只记在这台设备。<br>${FOOTER_NOTE}</p>
     <dialog id="img-dlg" class="img-dlg" aria-labelledby="img-t">
       <h2 id="img-t">完整报告图</h2>
       <p class="img-tip" id="img-tip"><b>长按下面的图片</b>，选“保存到相册”或“保存图片”。</p>
@@ -337,6 +339,26 @@ function renderResult() {
   });
   document.getElementById("retake").addEventListener("click", () => { if (confirm("重新测一次会清掉当前这份结果（已保存的历史记录不受影响），确定吗？")) { if (RK) RK.nickReset(); resetAnswers(); renderTips(); } });
   document.getElementById("tohome").addEventListener("click", renderHome);
+  mountResultCloud();
+}
+
+function currentNickname() {
+  try {
+    if (RK && RK.nick && typeof RK.nick.get === "function") return RK.nick.get();
+  } catch (e) { /* 没有结果工具时，分享会停在称呼门槛。 */ }
+  try { return localStorage.getItem("rk.v1.nickname") || ""; } catch (e) { return ""; }
+}
+
+function mountResultCloud() {
+  const slot = app.querySelector("[data-cloud-slot]");
+  if (!slot || !state.done || !isComplete(state.done)) return;
+  try {
+    mountZhenaiCloud(slot, {
+      nickname: currentNickname(),
+      answers: state.done.slice(),
+      completedAt: state.updated,
+    });
+  } catch (e) { console.error(e); }
 }
 
 /* ---------- 错误 ---------- */
