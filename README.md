@@ -13,8 +13,8 @@
 最低维度并列时取权重更高者。
 
 ## 特点
-- 纯静态：原生 HTML / CSS / ES Modules，无框架、无构建、无第三方服务、无外部字体（系统字体栈）。
-- 隐私：作答与结果只存浏览器 `localStorage`，不上传任何地方。可中断后继续。
+- 纯静态：原生 HTML / CSS / ES Modules，无框架、无构建、无外部字体（系统字体栈）。
+- 隐私：答题进度和 7 天打卡只存浏览器 `localStorage`。做完后结果页会自动提交一次结构化结果（36 道原始分和维度快照，不含打卡），换一条阅读短链。可中断后继续。
 - 雷达图为 SVG 自绘；金字塔是 **纯 SVG 伪 3D**（真旋转 + 轻微透视 + 画家算法 + 明暗，无任何 3D 库）：可左右拖动 / 方向键旋转，空闲时缓慢自转，`prefers-reduced-motion` 下静止。
 - **保存完整报告图**：用 canvas 手绘整份报告（含雷达图、3D 金字塔静态版、文字解读、7 天练习），2x 清晰 PNG；桌面直接下载，手机/微信里弹层“长按图片保存”。无外部库、无 CDN。
 - 全部资源使用相对路径，兼容 GitHub Pages 的 `/zhenai-pyramid/` 子路径。
@@ -31,6 +31,10 @@ js/pyramid3d.js     3D 金字塔（交互版与导出静态版共用同一份几
 js/report.js        报告数据模型（页面与导出长图共用文案）
 js/export.js        长图导出（canvas 手绘）
 js/storage.js       localStorage 读写与容错
+js/cloud-config.js  云端地址（与霍兰德、巨婴同一条 assessmentReportDev）
+js/cloud-client.js  提交号、短链、本机队列
+js/cloud-payload.js 上传体（计分仍走 scoring.js）
+js/cloud-share.js   结果页自动提交；「分享结果」只复制短链
 js/app.js           页面流程与渲染
 tests/              单元测试（node）与端到端脚本（Playwright，非项目依赖）
 .github/workflows/  Pages 部署
@@ -46,4 +50,4 @@ node scripts/serve.mjs 5173 /zhenai-pyramid/   # 访问 http://localhost:5173/zh
 ## 部署
 推送到 `main` 后，GitHub Actions 先跑 `npm test`，再把 `index.html css js assets` 发布到 GitHub Pages。
 
-页面不收集任何信息；结果与作答只保存在本机。
+答题进度留在本机。结果页自动提交一次后，「分享结果」复制 `https://xiangshu3721.github.io/mindtest-web/r/#{id}.{token}`。云函数若尚未把 `zhenai` 放进可保存名单，提交会失败，页面上可以重试；这份名单是单独的改动。

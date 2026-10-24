@@ -5,7 +5,7 @@
   "type": "module",
   "description": "珍爱金字塔·自我关系状态评估（纯静态 H5，数据仅存本机）",
   "scripts": {
-    "test": "node tests/scoring.test.mjs",
+    "test": "node tests/scoring.test.mjs && node --test tests/cloud-payload.test.mjs tests/cloud-client.test.mjs tests/cloud-share.test.mjs",
     "start": "node scripts/serve.mjs"
   }
 }

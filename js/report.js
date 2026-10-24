@@ -43,6 +43,6 @@ export function buildReport(r, practice = []) {
     practice: { title: `7天自我练习 · ${DIMS[L].name}`, intro: "这7天，每天对自己说（或写下）这一句：", sentence: `“${T.sentence}”`, how: T.how, done: practice.slice(), note: "点一下就算打卡，只记在你自己的手机里。" },
     dims: [...DIM_ORDER].sort((a, b) => r.scores[b] - r.scores[a]).map((k) => ({
       key: k, name: DIMS[k].name + (k === L ? " · 漏" : ""), score: r.scores[k], levelId: r.levels[k].id, levelName: r.levels[k].name, sub: DIMS[k].sub, desc: r.levels[k].desc, leak: k === L })),
-    footer: ["结果只保存在你这台设备的浏览器里，没有上传到任何地方。", FOOTER_NOTE],
+    footer: ["7天打卡只记在这台设备。阅读链接可以发给信任的人。", FOOTER_NOTE],
   };
 }
